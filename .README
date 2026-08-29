@@ -1,0 +1,54 @@
+# Telegram Order Management Bot
+
+A Telegram bot for a small business that lets customers browse products, build a shopping cart, save a delivery address, and place an order — with a database-backed system to support order tracking and (soon) admin management.
+
+This project was built as a portfolio piece to practice designing a real, production-style backend: relational database design, stateful conversation flows, and safe handling of concurrent operations (e.g. preventing overselling when stock is low).
+
+## Features
+
+**Implemented**
+- Product catalog with images, price, and stock, browsable directly in Telegram
+- Add-to-cart flow with quantity selection (quick-pick buttons or typed amount)
+- Multi-item shopping cart backed by a normalized database schema (`Orders` + `Order_Items`)
+- Stock validation to guard against overselling
+- Multi-step address form (address, postal code, address label) with per-user conversation state
+- Automatic user registration on first `/start`
+
+**Planned**
+- Order finalization and checkout confirmation
+- Payment gateway integration
+- In-app wallet (top-up, spend, refunds, and admin-approved withdrawal requests)
+- Order status tracking (processing → shipped → delivered)
+- A separate admin web panel for managing products, orders, and withdrawal requests
+
+## Tech Stack
+
+- **Python** — [`python-telegram-bot`](https://python-telegram-bot.org/) for the Telegram integration
+- **SQLite** — relational storage for products, users, orders, cart items, and wallet transactions
+- Planned: a web framework for the admin panel
+
+## Database Design
+
+The schema is normalized to avoid duplicate/inconsistent data — for example, cart items reference an `Order` rather than the `User` directly, and every wallet change is recorded as its own transaction row (a ledger) rather than just a single balance number, so every change in a user's balance can be traced back to its source.
+
+## Status
+
+ Actively in development. This is a learning-driven build — see the commit history for the step-by-step progression from schema design through to the current feature set.
+
+## Setup
+
+```bash
+git clone <repo-url>
+cd <project-folder>
+pip install -r requirements.txt
+```
+
+Create a `.env` file with your bot token:
+```
+BOT_TOKEN=your_telegram_bot_token
+```
+
+Then run:
+```bash
+python main.py
+```
