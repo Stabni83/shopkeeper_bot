@@ -5,7 +5,7 @@ sql_statements = [
             Product_id  INTEGER PRIMARY KEY,
             Products_image TEXT,
             Products_name TEXT NOT NULL, 
-            Quantity INTEGER DEFAULT 0 , 
+            Quantity INTEGER DEFAULT 0 CHECK(Quantity >= 0) , 
             Price Decimal NOT NULL,
             Information TEXT NOT NULL
         );""",
@@ -26,8 +26,8 @@ sql_statements = [
             User_id  INTEGER  NOT NULL,
             Adress_id  INTEGER,
             Date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
-            Sum Decimal DEFAULT 0 , 
-            Price Decimal DEFAULT 0,
+            Sum Decimal DEFAULT 0   CHECK (Sum >= 0),  
+            Price Decimal DEFAULT 0 CHECK (Price >= 0),
             Order_Status TEXT NOT NULL CHECK(Order_Status IN ('Selecting', 'Awaiting payment', 'Paid','Processing','Sent','Cancelled')),
             FOREIGN KEY (User_id) REFERENCES Users (User_id),
             FOREIGN KEY (Adress_id) REFERENCES Adress(Adress_id)
@@ -44,9 +44,9 @@ sql_statements = [
     """CREATE TABLE IF NOT EXISTS Wallet_Transactions (
             Wallet_Transactions_id  INTEGER PRIMARY KEY,
             User_id  INTEGER  NOT NULL,
-            Type TEXT NOT NULL,
-            Amount Decimal NOT NULL,
-            Direction TEXT NOT NULL,
+            Type TEXT  NOT NULL CHECK(Type IN ('Top-up' , 'Refund' , 'Purchase' , 'Withdrawal' )),
+            Amount Decimal NOT NULL CHECK ( Amount> 0),
+            Direction TEXT NOT NULL CHECK(Direction IN ('In' , 'Out')),
             Order_id  INTEGER ,
             Description TEXT NOT NULL,
             Created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -114,7 +114,7 @@ def Product_Equilibrium_Analysis(cursor, Product_id, quantity=0):
 
 def add_to_cart(cursor, product_id, quantity, user_id, price):
     cursor.execute(
-        "SELECT User_id   FROM Orders  WHERE User_id = ? AND Order_Status = ?",
+        "SELECT  Order_id  FROM Orders  WHERE User_id = ? AND Order_Status = ?",
         (user_id, "Selecting"),
     )
     order_row = cursor.fetchone()
@@ -181,6 +181,29 @@ def show_order_id(cursor, user_id):
     return row
 
 
+def show_order_id_awaiting(cursor, user_id):
+    cursor.execute(
+        "SELECT Order_id   FROM Orders  WHERE User_id = ? And Order_Status = ? ",
+        (
+            user_id,
+            "Awaiting payment",
+        ),
+    )
+    row = cursor.fetchone()
+    return row
+
+
+def show_adress(cursor, user_id):
+    cursor.execute(
+        "SELECT  Adress.Adress_name , Adress.User_adress  ,Orders.Order_Status  FROM Adress , Orders WHERE Adress.User_id = ? And Orders.Order_Status = ? ",
+        (
+            user_id,
+            "Awaiting payment",
+        ),
+    )
+    row = cursor.fetchone()
+    return row
+
 def get_user_addresses(cursor, user_id):
     cursor.execute(
         "SELECT Adress_name , User_adress , Postal_code FROM Adress  WHERE User_id = ?",
@@ -209,8 +232,8 @@ def finalize_order(cursor, order_id, adress_id):
     )
 
 
-def Payment_Gateway (cursor,order_id):
-        cursor.execute(
+def Payment_Gateway(cursor, order_id):
+    cursor.execute(
         "UPDATE Orders SET  Order_Status = ?  WHERE Order_id  = ?",
         (
             "Paid",
@@ -220,7 +243,58 @@ def Payment_Gateway (cursor,order_id):
 
 
 def Purchase_Status(cursor, user_id):
-    pass
+
+    cursor.execute(
+        "SELECT User_id   FROM Orders  WHERE User_id = ? And Order_Status IN (?,?,?) ",
+        (user_id, "Paid", "Processing", "Sent"),
+    )
+    order_row = cursor.fetchone()
+    if order_row == None:
+        return 0
+    else:
+        cursor.execute(
+            "SELECT Products.Products_name ,Order_Items.Quantity , Order_Items.price , Orders.Order_Status , Orders.price , Orders.Sum , Orders.Order_id FROM Products , Orders, Order_Items  WHERE Orders.Order_id =Order_Items.Order_id And Order_Items.product_id = Products.Product_id And Orders.User_id = ? And Order_Status IN (?,?,?)",
+            (user_id, "Paid", "Processing", "Sent"),
+        )
+        rows = cursor.fetchall()
+        return rows
+
+
+def cancel_order(cursor, user_id, order_id):
+    cursor.execute(
+        "UPDATE Orders SET  Order_Status = ?  WHERE Order_id  = ?"
+                ,(
+            "Cancelled",
+            order_id,
+        ),
+    )
+    cursor.execute(
+        "SELECT Price , Quantity , Product_id  FROM Order_Items  WHERE Order_id = ?"
+            ,(
+                order_id,
+        ),
+    )
+    rows = cursor.fetchall()
+    for row in rows:
+        sum_price = 0
+        sum_price = row [0] * row [1]
+        product_id = row [2]
+        quantity=row[1]
+        cursor.execute(
+        "UPDATE Wallet_Transactions SET  Amount = Amount + ?  WHERE User_id  = ?"
+                ,(
+            sum_price,
+            user_id,
+        ),
+    )   
+        cursor.execute(
+        "UPDATE Products SET  Quantity = Quantity +?  WHERE Product_id  = ?"
+                ,(
+            quantity,        
+            product_id,
+        ),
+    ) 
+
 
 
 database_file = "shopkeeper.db"

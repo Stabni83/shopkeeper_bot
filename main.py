@@ -20,13 +20,17 @@ import sqlite3
 
 import os
 
+
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
+markup1 = ReplyKeyboardMarkup(
+    [["Shopping Cart", "Products", "Wallet", "Purchase_Status"]]
+)
 
 async def start_Command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    markup1 = ReplyKeyboardMarkup([["Shopping Cart", "Products", "Wallet","Purchase_Status"]])
+
     await update.message.reply_text(
         "hello body",
         reply_markup=markup1,
@@ -44,9 +48,9 @@ async def start_Command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def Menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message.text
     if message == "Shopping Cart":
+        Telegram_id = update.effective_user.id
         database_file = "shopkeeper.db"
         with sqlite3.connect(database_file) as conn:
-            Telegram_id = update.effective_user.id
             cursor = conn.cursor()
             user_id = database.find_user_id(cursor, Telegram_id)[0]
             Shopping_Cart = database.View_Shopping_Cart(cursor, user_id)
@@ -58,18 +62,66 @@ async def Menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 Description = ""
                 for Shopping in Shopping_Cart:
                     Description += f"Product Name: {Shopping[0]} \n Quantity: {Shopping[1]} \n Price {Shopping[2]} \n Status{Shopping[3]}\n"
+                if Shopping[3] == "Awaiting payment":
+                    address=database.show_adress(cursor, user_id)
+                    await update.message.reply_text(
+                        Description
+                        + f"Total products{Shopping[4]} , Total price of products{Shopping[5]}"
+                        + f"adress name : {address[0]} \n adress : {address[1]}",
+                        reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "Proceed to payment gateway",
+                                    callback_data="Payment_Gateway",
+                                )
+                            ]
+                        ]))
+                else:
+                    await update.message.reply_text(
+                            Description
+                            + f"Total products{Shopping[4]} , Total price of products{Shopping[5]}",
+                            reply_markup=InlineKeyboardMarkup(
+                                [[InlineKeyboardButton("adress", callback_data="adress_form")]]
+                            ),
+                        )
 
+            conn.commit()
+    elif message == "Purchase_Status":
+        Telegram_id = update.effective_user.id
+        database_file = "shopkeeper.db"
+        with sqlite3.connect(database_file) as conn:
+            cursor = conn.cursor()
+            user_id = database.find_user_id(cursor, Telegram_id)[0]
+            Purchase_Status = database.Purchase_Status(cursor, user_id)
+            if Purchase_Status == 0:
+                await update.message.reply_text(
+                    "You haven't placed any orders yet.",
+                )
+            else:
+                Description = ""
+                total_products = 0
+                total_price = 0
+                for Purchase in Purchase_Status:
+                    Description += f"Product Name: {Purchase[0]} \n Quantity: {Purchase[1]} \n Price {Purchase[2]} \n Status{Purchase[3]}\n"
+                    total_products += Purchase[4]
+                    total_price += Purchase[5]
                 await update.message.reply_text(
                     Description
-                    + f"Total products{Shopping[4]} , Total price of products{Shopping[5]}",
-                    reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton("adress", callback_data="adress_form")]]
-                    ),
+                    + f"Total products : {total_products} , Total price of products : {total_price}"
                 )
+                for Purchase in Purchase_Status:
+                    if Purchase[3] in ("Paid", "Processing"):
+                        await update.message.reply_text(
+                            f"Product Name: {Purchase[0]} \n Quantity: {Purchase[1]} \n Price {Purchase[2]} \n Status{Purchase[3]}\n",
 
-        conn.commit()
-    elif message == "Purchase_Status":
-        pass
+                            reply_markup=InlineKeyboardMarkup(
+                                [[InlineKeyboardButton("cancel this order", callback_data=f"canceling_order_{Purchase[6]}")]]
+                            ),
+                        )
+                    
+
+            conn.commit()
     elif message == "Products":
         database_file = "shopkeeper.db"
         with sqlite3.connect(database_file) as conn:
@@ -218,13 +270,13 @@ async def Address_Form_Handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
             await update.message.reply_text("The address was successfully registered.")
             await update.message.reply_text(
-                f"Your name address:{adress_data["adress_name"]}\n Your address:{adress_data["adress_text"]}\n Postal code: {adress_data["Postal_code"]} ",
+                f"Your name address:{adress_data['adress_name']}\n Your address:{adress_data['adress_text']}\n Postal code: {adress_data['Postal_code']} ",
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [
                             InlineKeyboardButton(
                                 "confirm this address",
-                                callback_data="confirm this address",
+                                callback_data="confirm_address",
                             )
                         ]
                     ]
@@ -241,7 +293,7 @@ async def Address_Form_Handler(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
 
-async def confirm_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def Confirm_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if "adress_form" in context.user_data:
 
@@ -266,38 +318,77 @@ async def confirm_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.commit()
         await update.callback_query.answer()
 
-        await update.message.reply_text(
+        await update.callback_query.message.reply_text(
             "Everything is all set; you can complete your purchase.",
-            
+            reply_markup=InlineKeyboardMarkup(
+    [
+        [
             InlineKeyboardButton(
-                "Proceed to payment gateway", callback_data="Payment Gateway"
+                "Proceed to payment gateway",
+                callback_data="Payment_Gateway",
             )
+        ]
+    ]
+     
+    )
+            
         )
+
         del context.user_data["adress_form"]
     else:
         return
 
 
 async def Payment_Gateway(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    Telegram_id = update.effective_user.id
+    database_file = "shopkeeper.db"
+    with sqlite3.connect(database_file) as conn:
+
+        cursor = conn.cursor()
+        user_id = database.find_user_id(cursor, Telegram_id)[0]
+        order_id = database.show_order_id_awaiting(cursor, user_id)[0]
+        database.Payment_Gateway(cursor, order_id)
+
+        conn.commit()
+
+    await update.callback_query.message.reply_text(
+        "Thank you for your purchase.",
+         reply_markup=markup1,
         
-        Telegram_id = update.effective_user.id
-        database_file = "shopkeeper.db"
-        with sqlite3.connect(database_file) as conn:
+    )
 
-            cursor = conn.cursor()
-            user_id = database.find_user_id(cursor, Telegram_id)[0]
-            order_id = database.show_order_id(cursor, user_id)[0]
-            database.Payment_Gateway(cursor, order_id)
 
-            conn.commit()
-    
-        await update.message.reply_markup(
-            "Thank you for your purchase.",
-            
-            InlineKeyboardButton(
-                "Purchase Status", callback_data="Purchase_Status"
-            )            
-        )
+async def Confirm_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.callback_query
+    order_id = int(message.data.split("_")[2])
+    await update.callback_query.message.reply_text(
+
+    "Are you sure you want to cancel your purchase?",
+
+    reply_markup=InlineKeyboardMarkup(
+        [[InlineKeyboardButton("cancel this order", callback_data=f"confirm_cancel_{order_id}")]]
+    ),
+    )   
+
+
+async def Cancel_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.callback_query
+    order_id = int(message.data.split("_")[2])
+    Telegram_id = update.effective_user.id
+    database_file = "shopkeeper.db"
+    with sqlite3.connect(database_file) as conn:
+
+        cursor = conn.cursor()
+        user_id = database.find_user_id(cursor, Telegram_id)[0]   
+        database.cancel_order(cursor, user_id, order_id)    
+
+        conn.commit()
+        await update.callback_query.message.reply_text(
+        "Your purchase has been successfully cancelled.",
+         reply_markup=markup1,
+        
+    )
 
 
 def Check_Availability_And_Purchase(product_id, quantity, Telegram_id):
@@ -330,22 +421,22 @@ def main():
         MessageHandler(
             filters=filters.TEXT & ~filters.COMMAND,
             callback=Address_Form_Handler,
+            ),
             group=0,
         )
-    )
     application.add_handler(
         MessageHandler(
             filters=filters.TEXT & ~filters.COMMAND,
             callback=Receive_Typed_Quantity,
-            group=1,
-        )
+        ),
+        group=1,
     )
     application.add_handler(
         MessageHandler(
             filters=filters.TEXT & ~filters.COMMAND,
             callback=Menu_message_handler,
-            group=2,
-        )
+        ),
+        group=2,
     )
     application.add_handler(
         CallbackQueryHandler(
@@ -362,7 +453,16 @@ def main():
         CallbackQueryHandler(pattern="^adress_form", callback=Address_Form)
     )
     application.add_handler(
-        CallbackQueryHandler(pattern="^confirm this address", callback=confirm_address)
+        CallbackQueryHandler(pattern="^confirm_address", callback=Confirm_address)
+    )
+    application.add_handler(
+        CallbackQueryHandler(pattern="^Payment_Gateway", callback=Payment_Gateway)
+    )
+    application.add_handler(
+        CallbackQueryHandler(pattern="^canceling_order", callback=Confirm_cancel)
+    )
+    application.add_handler(
+    CallbackQueryHandler(pattern="^confirm_cancel", callback=Cancel_purchase)
     )
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
