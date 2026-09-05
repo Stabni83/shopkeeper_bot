@@ -28,8 +28,8 @@ markup1 = ReplyKeyboardMarkup(
     [["Shopping Cart", "Products", "Wallet", "Purchase_Status"]]
 )
 
-async def start_Command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+async def start_Command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "hello body",
@@ -59,30 +59,39 @@ async def Menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                     "Your shopping cart history is empty.",
                 )
             else:
-                Description = ""
+                
                 for Shopping in Shopping_Cart:
+                    Description = ""
                     Description += f"Product Name: {Shopping[0]} \n Quantity: {Shopping[1]} \n Price {Shopping[2]} \n Status{Shopping[3]}\n"
-                if Shopping[3] == "Awaiting payment":
-                    address=database.show_adress(cursor, user_id)
-                    await update.message.reply_text(
-                        Description
-                        + f"Total products{Shopping[4]} , Total price of products{Shopping[5]}"
-                        + f"adress name : {address[0]} \n adress : {address[1]}",
-                        reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "Proceed to payment gateway",
-                                    callback_data="Payment_Gateway",
-                                )
-                            ]
-                        ]))
-                else:
-                    await update.message.reply_text(
+                    if Shopping[3] == "Awaiting payment":
+                        address = database.show_adress(cursor, user_id)
+                        await update.message.reply_text(
+                            Description
+                            + f"Total products{Shopping[4]} , Total price of products{Shopping[5]}"
+                            + f"adress name : {address[0]} \n adress : {address[1]}",
+                            reply_markup=InlineKeyboardMarkup(
+                                [
+                                    [
+                                        InlineKeyboardButton(
+                                            "Proceed to payment gateway",
+                                            callback_data=f"Payment_Gateway_{Shopping[6]}",
+                                        )
+                                    ]
+                                ]
+                            ),
+                        )
+                    else:
+                        await update.message.reply_text(
                             Description
                             + f"Total products{Shopping[4]} , Total price of products{Shopping[5]}",
                             reply_markup=InlineKeyboardMarkup(
-                                [[InlineKeyboardButton("adress", callback_data="adress_form")]]
+                                [
+                                    [
+                                        InlineKeyboardButton(
+                                            "adress", callback_data="adress_form"
+                                        )
+                                    ]
+                                ]
                             ),
                         )
 
@@ -114,12 +123,17 @@ async def Menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                     if Purchase[3] in ("Paid", "Processing"):
                         await update.message.reply_text(
                             f"Product Name: {Purchase[0]} \n Quantity: {Purchase[1]} \n Price {Purchase[2]} \n Status{Purchase[3]}\n",
-
                             reply_markup=InlineKeyboardMarkup(
-                                [[InlineKeyboardButton("cancel this order", callback_data=f"canceling_order_{Purchase[6]}")]]
+                                [
+                                    [
+                                        InlineKeyboardButton(
+                                            "cancel this order",
+                                            callback_data=f"canceling_order_{Purchase[6]}",
+                                        )
+                                    ]
+                                ]
                             ),
                         )
-                    
 
             conn.commit()
     elif message == "Products":
@@ -131,24 +145,47 @@ async def Menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
             for product in products:
 
-                Add_to_cart_markup = InlineKeyboardMarkup(
-                    [
-                        [
-                            InlineKeyboardButton(
-                                "Add to cart", callback_data=f"Add to cart_{product[0]}"
-                            )
-                        ]
-                    ]
-                )
                 await update.message.reply_photo(
                     product[1],
                     f"Product Name: {product[2]} \n Remaining quantity: {product[3]} \n Price: {product[4]} \n Description: {product[5]}",
-                    reply_markup=Add_to_cart_markup,
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "Add to cart",
+                                    callback_data=f"Add to cart_{product[0]}",
+                                )
+                            ]
+                        ]
+                    ),
                 )
 
             conn.commit()
     elif message == "Wallet":
-        pass
+        database_file = "shopkeeper.db"
+        with sqlite3.connect(database_file) as conn:
+            Telegram_id = update.effective_user.id
+            cursor = conn.cursor()
+            user_id = database.find_user_id(cursor, Telegram_id)[0]
+            Wallet_Balance = database.Checking_wallet_balance(cursor, user_id)[0]
+            conn.commit()
+            await update.message.reply_text(
+                f"Wallet Balance :{Wallet_Balance} ",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "Top up wallet", callback_data=f"Top up wallet"
+                            ),
+                            InlineKeyboardButton(
+                                "Withdrawal of funds",
+                                callback_data=f"Withdrawal_of_funds",
+                            ),
+                        ]
+                    ]
+                ),
+            )
+
     else:
 
         await update.message.reply_text("I didn't understand.")
@@ -314,62 +351,170 @@ async def Confirm_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
             order_id = database.show_order_id(cursor, user_id)[0]
 
             database.finalize_order(cursor, order_id, adress_id)
-
+            wallet = database.Checking_wallet_balance(cursor, user_id)[0]
+            price = database.Checking_price_order(cursor, order_id)[0]
             conn.commit()
-        await update.callback_query.answer()
+        if wallet >= price:
+            await update.callback_query.answer()
 
-        await update.callback_query.message.reply_text(
-            "Everything is all set; you can complete your purchase.",
-            reply_markup=InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton(
-                "Proceed to payment gateway",
-                callback_data="Payment_Gateway",
+            await update.callback_query.message.reply_text(
+                "Everything is all set; you can complete your purchase. \n"
+                + f"Wallet Balance : {wallet}",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "Payment from wallet balance",
+                                callback_data=f"Payment_wallet_{order_id}",
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                "Proceed to payment gateway",
+                                callback_data=f"Payment_Gateway_{order_id}",
+                            )
+                        ],
+                    ]
+                ),
             )
-        ]
-    ]
-     
-    )
-            
-        )
+        else:
+            await update.callback_query.answer()
+
+            await update.callback_query.message.reply_text(
+                "Everything is all set; you can complete your purchase.",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "Proceed to payment gateway",
+                                callback_data=f"Payment_Gateway_{order_id}",
+                            )
+                        ]
+                    ]
+                ),
+            )
 
         del context.user_data["adress_form"]
     else:
         return
 
 
-async def Payment_Gateway(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def Payment_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     Telegram_id = update.effective_user.id
+    message = update.callback_query
+    order_id = int(message.data.split("_")[2])
     database_file = "shopkeeper.db"
     with sqlite3.connect(database_file) as conn:
 
         cursor = conn.cursor()
         user_id = database.find_user_id(cursor, Telegram_id)[0]
-        order_id = database.show_order_id_awaiting(cursor, user_id)[0]
+        price = database.Checking_price_order(cursor, order_id)[0]
         database.Payment_Gateway(cursor, order_id)
-
+        database.record_wallet_transaction(
+            cursor, user_id, "Purchase", price, "Out", "To purchase", order_id
+        )
         conn.commit()
 
     await update.callback_query.message.reply_text(
         "Thank you for your purchase.",
-         reply_markup=markup1,
-        
+        reply_markup=markup1,
     )
+
+
+async def Payment_Gateway(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.callback_query
+    if "topup" in message.data.split("_")[2]:
+        amount = int(message.data.split("_")[3])
+        await update.callback_query.message.reply_text(
+            "Since this is a test project, we are not using the actual payment gateway; instead, we are using a mock version. Please select an option to proceed.",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "Successful payment",
+                            callback_data=f"top_up_Confirm_{amount}_1",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "Payment failed",
+                            callback_data=f"top_up_Confirm_{amount}_0",
+                        )
+                    ],
+                ]
+            ),
+        )
+    else:
+        order_id = int(message.data.split("_")[2])
+        await update.callback_query.answer()
+
+        await update.callback_query.message.reply_text(
+            "Since this is a test project, we are not using the actual payment gateway; instead, we are using a mock version. Please select an option to proceed.",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "Successful payment",
+                            callback_data=f"Payment_Confirmation_{order_id}_1",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "Payment failed",
+                            callback_data=f"Payment_Confirmation_{order_id}_0",
+                        )
+                    ],
+                ]
+            ),
+        )
+
+
+async def Payment_Confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.callback_query
+    order_id = int(message.data.split("_")[2])
+    payment_confirmation = int(message.data.split("_")[3])
+    if payment_confirmation == 0:
+        await update.callback_query.message.reply_text(
+            "Your payment was unsuccessful.\n Please try again.",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "Repayment",
+                            callback_data=f"Payment_Gateway_{order_id}",
+                        )
+                    ]
+                ]
+            ),
+        )
+    else:
+        database_file = "shopkeeper.db"
+        with sqlite3.connect(database_file) as conn:
+
+            cursor = conn.cursor()
+            database.Payment_Gateway(cursor, order_id)
+            conn.commit()
+        await update.callback_query.message.reply_text(
+            "The operation was successful. Thank you for your purchase.",
+        )
 
 
 async def Confirm_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.callback_query
     order_id = int(message.data.split("_")[2])
     await update.callback_query.message.reply_text(
-
-    "Are you sure you want to cancel your purchase?",
-
-    reply_markup=InlineKeyboardMarkup(
-        [[InlineKeyboardButton("cancel this order", callback_data=f"confirm_cancel_{order_id}")]]
-    ),
-    )   
+        "Are you sure you want to cancel your purchase?",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "cancel this order", callback_data=f"confirm_cancel_{order_id}"
+                    )
+                ]
+            ]
+        ),
+    )
 
 
 async def Cancel_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -380,15 +525,192 @@ async def Cancel_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with sqlite3.connect(database_file) as conn:
 
         cursor = conn.cursor()
-        user_id = database.find_user_id(cursor, Telegram_id)[0]   
-        database.cancel_order(cursor, user_id, order_id)    
+        user_id = database.find_user_id(cursor, Telegram_id)[0]
+        database.cancel_order(cursor, user_id, order_id)
 
         conn.commit()
         await update.callback_query.message.reply_text(
-        "Your purchase has been successfully cancelled.",
-         reply_markup=markup1,
-        
+            "Your purchase has been successfully cancelled.",
+            reply_markup=markup1,
+        )
+
+
+async def Top_up_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    await update.callback_query.answer()
+
+    await update.callback_query.message.reply_text(
+        "Enter the desired quantity.",
     )
+    context.user_data["Top_up_wallet"] = True
+
+
+async def Amount_top_up_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if "Top_up_wallet" in context.user_data:
+        amount = int(update.message.text)
+        await update.message.reply_text(
+            f"The amount by which you want to top up your wallet : {amount}",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "Confirm", callback_data=f"Payment_Gateway_topup_{amount}"
+                        )
+                    ]
+                ]
+            ),
+        )
+        del context.user_data["Top_up_wallet"]
+
+        raise ApplicationHandlerStop()
+    else:
+        return
+
+
+async def top_up_Confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.callback_query
+    amount = int(message.data.split("_")[3])
+    payment_confirmation = int(message.data.split("_")[4])
+    if payment_confirmation == 0:
+        await update.callback_query.message.reply_text(
+            "Your payment was unsuccessful.\n Please try again.",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "Repayment",
+                            callback_data=f"Payment_Gateway_topup_{amount}",
+                        )
+                    ]
+                ]
+            ),
+        )
+    else:
+        Telegram_id = update.effective_user.id
+        database_file = "shopkeeper.db"
+        with sqlite3.connect(database_file) as conn:
+            cursor = conn.cursor()
+
+            user_id = database.find_user_id(cursor, Telegram_id)[0]
+            database.record_wallet_transaction(
+                cursor, user_id, "Top_up", amount, "In", f"Top up your wallet"
+            )
+            
+
+            conn.commit()
+        await update.callback_query.message.reply_text(
+            "Your wallet has been successfully topped up.",
+        )
+
+
+async def Withdrawal_of_funds(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    Telegram_id = update.effective_user.id
+    database_file = "shopkeeper.db"
+    with sqlite3.connect(database_file) as conn:
+
+        cursor = conn.cursor()
+        user_id = database.find_user_id(cursor, Telegram_id)[0]
+
+        wallet = database.Checking_wallet_balance(cursor, user_id)[0]
+
+        conn.commit()
+    await update.callback_query.answer()
+
+    await update.callback_query.message.reply_text(
+        f"Your wallet balance : {wallet} \n"
+        + "How much do you want to deduct from your account balance?",
+    )
+    context.user_data["Withdrawal_of_funds"] = {
+        "amount": "",
+        "sheba_number": "",
+        "step": 1,
+    }
+
+
+async def Operations_Withdrawal_of_funds(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if "Withdrawal_of_funds" in context.user_data:
+        if context.user_data["Withdrawal_of_funds"]["step"] == 1:
+
+            amount = context.user_data["Withdrawal_of_funds"]["amount"] = int(
+                update.message.text
+            )
+            Telegram_id = update.effective_user.id
+            database_file = "shopkeeper.db"
+            with sqlite3.connect(database_file) as conn:
+
+                cursor = conn.cursor()
+                user_id = database.find_user_id(cursor, Telegram_id)[0]
+                wallet = database.Checking_wallet_balance(cursor, user_id)[0]
+
+                conn.commit()
+            if amount > wallet:
+                await update.message.reply_text(
+                    "The requested amount exceeds your wallet balance; please submit the request again.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "Withdrawal of funds",
+                                    callback_data=f"Withdrawal_of_funds",
+                                )
+                            ]
+                        ]
+                    ),
+                )
+
+                raise ApplicationHandlerStop()
+            else:
+                await update.message.reply_text(
+                    "Please enter your Sheba number.",
+                )
+                context.user_data["Withdrawal_of_funds"]["step"] = 2
+                raise ApplicationHandlerStop()
+        elif context.user_data["Withdrawal_of_funds"]["step"] == 2:
+
+            sheba_number = context.user_data["Withdrawal_of_funds"]["sheba_number"] = (
+                update.message.text
+            )
+            if not (
+                sheba_number.startswith("IR")
+                and len(sheba_number) == 26
+                and sheba_number[2:].isdigit()
+            ):
+                await update.message.reply_text(
+                    "Your Sheba number is incorrect; please try again.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "Withdrawal of funds",
+                                    callback_data=f"Withdrawal_of_funds",
+                                )
+                            ]
+                        ]
+                    ),
+                )
+                raise ApplicationHandlerStop()
+            else:
+                amount = context.user_data["Withdrawal_of_funds"]["amount"]
+                Telegram_id = update.effective_user.id
+                database_file = "shopkeeper.db"
+                with sqlite3.connect(database_file) as conn:
+                    cursor = conn.cursor()
+                    user_id = database.find_user_id(cursor, Telegram_id)[0]
+                    database.Withdrawal_of_funds(cursor, user_id, sheba_number, amount)
+                    conn.commit()
+                await update.message.reply_text(
+                    "Your request has been received and will be reviewed as soon as possible.",
+                    reply_markup=markup1,
+                )
+
+                del context.user_data["Withdrawal_of_funds"]
+                raise ApplicationHandlerStop()
+
+    else:
+        return
 
 
 def Check_Availability_And_Purchase(product_id, quantity, Telegram_id):
@@ -421,9 +743,9 @@ def main():
         MessageHandler(
             filters=filters.TEXT & ~filters.COMMAND,
             callback=Address_Form_Handler,
-            ),
-            group=0,
-        )
+        ),
+        group=0,
+    )
     application.add_handler(
         MessageHandler(
             filters=filters.TEXT & ~filters.COMMAND,
@@ -434,9 +756,23 @@ def main():
     application.add_handler(
         MessageHandler(
             filters=filters.TEXT & ~filters.COMMAND,
-            callback=Menu_message_handler,
+            callback=Amount_top_up_wallet,
         ),
         group=2,
+    )
+    application.add_handler(
+        MessageHandler(
+            filters=filters.TEXT & ~filters.COMMAND,
+            callback=Operations_Withdrawal_of_funds,
+        ),
+        group=3,
+    )
+    application.add_handler(
+        MessageHandler(
+            filters=filters.TEXT & ~filters.COMMAND,
+            callback=Menu_message_handler,
+        ),
+        group=4,
     )
     application.add_handler(
         CallbackQueryHandler(
@@ -459,10 +795,29 @@ def main():
         CallbackQueryHandler(pattern="^Payment_Gateway", callback=Payment_Gateway)
     )
     application.add_handler(
+        CallbackQueryHandler(pattern="^Payment_wallet", callback=Payment_wallet)
+    )
+    application.add_handler(
+        CallbackQueryHandler(
+            pattern="^Payment_Confirmation", callback=Payment_Confirmation
+        )
+    )
+    application.add_handler(
         CallbackQueryHandler(pattern="^canceling_order", callback=Confirm_cancel)
     )
     application.add_handler(
-    CallbackQueryHandler(pattern="^confirm_cancel", callback=Cancel_purchase)
+        CallbackQueryHandler(pattern="^confirm_cancel", callback=Cancel_purchase)
+    )
+    application.add_handler(
+        CallbackQueryHandler(pattern="^Top up wallet", callback=Top_up_wallet)
+    )
+    application.add_handler(
+        CallbackQueryHandler(pattern="^top_up_Confirm", callback=top_up_Confirm)
+    )
+    application.add_handler(
+        CallbackQueryHandler(
+            pattern="^Withdrawal_of_funds", callback=Withdrawal_of_funds
+        )
     )
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 

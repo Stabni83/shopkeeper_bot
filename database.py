@@ -44,11 +44,11 @@ sql_statements = [
     """CREATE TABLE IF NOT EXISTS Wallet_Transactions (
             Wallet_Transactions_id  INTEGER PRIMARY KEY,
             User_id  INTEGER  NOT NULL,
-            Type TEXT  NOT NULL CHECK(Type IN ('Top-up' , 'Refund' , 'Purchase' , 'Withdrawal' )),
+            Type TEXT  NOT NULL CHECK(Type IN ('Top_up' , 'Refund' , 'Purchase' , 'Withdrawal' )),
             Amount Decimal NOT NULL CHECK ( Amount> 0),
             Direction TEXT NOT NULL CHECK(Direction IN ('In' , 'Out')),
             Order_id  INTEGER ,
-            Description TEXT NOT NULL,
+            Description TEXT ,
             Created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (Order_id) REFERENCES Orders (Order_id),
             FOREIGN KEY (User_id) REFERENCES Users (User_id)
@@ -158,7 +158,7 @@ def View_Shopping_Cart(cursor, user_id):
         return 0
     else:
         cursor.execute(
-            "SELECT Products.Products_name ,Order_Items.Quantity , Order_Items.price , Orders.Order_Status , Orders.price , Orders.Sum  FROM Products , Orders, Order_Items  WHERE Orders.Order_id =Order_Items.Order_id And Order_Items.product_id = Products.Product_id And Orders.User_id = ? And Order_Status IN (?,?)",
+            "SELECT Products.Products_name ,Order_Items.Quantity , Order_Items.price , Orders.Order_Status , Orders.price , Orders.Sum , Orders.Order_id FROM Products , Orders, Order_Items  WHERE Orders.Order_id =Order_Items.Order_id And Order_Items.product_id = Products.Product_id And Orders.User_id = ? And Order_Status IN (?,?)",
             (
                 user_id,
                 "Selecting",
@@ -203,6 +203,7 @@ def show_adress(cursor, user_id):
     )
     row = cursor.fetchone()
     return row
+
 
 def get_user_addresses(cursor, user_id):
     cursor.execute(
@@ -262,39 +263,98 @@ def Purchase_Status(cursor, user_id):
 
 def cancel_order(cursor, user_id, order_id):
     cursor.execute(
-        "UPDATE Orders SET  Order_Status = ?  WHERE Order_id  = ?"
-                ,(
+        "UPDATE Orders SET  Order_Status = ?  WHERE Order_id  = ?",
+        (
             "Cancelled",
             order_id,
         ),
     )
     cursor.execute(
-        "SELECT Price , Quantity , Product_id  FROM Order_Items  WHERE Order_id = ?"
-            ,(
-                order_id,
-        ),
+        "SELECT Price , Quantity , Product_id  FROM Order_Items  WHERE Order_id = ?",
+        (order_id,),
     )
     rows = cursor.fetchall()
     for row in rows:
         sum_price = 0
-        sum_price = row [0] * row [1]
-        product_id = row [2]
-        quantity=row[1]
+        sum_price = row[0] * row[1]
+        product_id = row[2]
+        quantity = row[1]
+        record_wallet_transaction(
+            cursor, user_id, "Refund", sum_price, "In", "Cancel Order", order_id
+        )
         cursor.execute(
-        "UPDATE Wallet_Transactions SET  Amount = Amount + ?  WHERE User_id  = ?"
-                ,(
-            sum_price,
-            user_id,
-        ),
-    )   
-        cursor.execute(
-        "UPDATE Products SET  Quantity = Quantity +?  WHERE Product_id  = ?"
-                ,(
-            quantity,        
-            product_id,
-        ),
-    ) 
+            "UPDATE Products SET  Quantity = Quantity +?  WHERE Product_id  = ?",
+            (
+                quantity,
+                product_id,
+            ),
+        )
 
+
+def record_wallet_transaction(
+    cursor, user_id, type, amount, direction, description, order_id=None
+):
+    if direction == "Out":
+        cursor.execute(
+            "SELECT  Walet FROM Users  WHERE User_id = ? ",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        if row[0] >= amount:
+            if type == "Purchase":
+                cursor.execute(
+                    "INSERT INTO Wallet_Transactions ( User_id , Type , Amount , Direction , Order_id , Description ) VALUES(?,?,?,?,?,?)",
+                    (user_id, type, amount, direction, order_id, description),
+                )
+                cursor.execute(
+                    "UPDATE Users SET Walet = Walet - ?  WHERE  User_id = ?",
+                    (
+                        amount,
+                        user_id,
+                    ),
+                )
+            elif type == "Withdrawal":
+                pass
+        else:
+            return 0
+
+    else:
+        cursor.execute(
+            "INSERT INTO Wallet_Transactions ( User_id , Type , Amount , Direction , Order_id , Description ) VALUES(?,?,?,?,?,?)",
+            (user_id, type, amount, direction, order_id, description),
+        )
+        cursor.execute(
+            "UPDATE Users SET Walet = Walet + ?  WHERE  User_id = ?",
+            (
+                amount,
+                user_id,
+            ),
+        )
+
+
+def Checking_wallet_balance(cursor, user_id):
+    cursor.execute(
+        "SELECT Walet  FROM Users  WHERE User_id = ?  ",
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    return row
+
+
+def Checking_price_order(cursor, order_id):
+    cursor.execute(
+        "SELECT Price  FROM Orders  WHERE Order_id = ?  ",
+        (order_id,),
+    )
+    row = cursor.fetchone()
+    return row
+
+
+def Withdrawal_of_funds(cursor, user_id, sheba_number, amount):
+    cursor.execute(
+        "INSERT INTO Withdrawal_Requests ( User_id , Amount , Sheba_number , Withdrawal_Requests_Status ) VALUES(?,?,?,?)",
+        (user_id, amount, sheba_number, "pending"),
+    )
 
 
 database_file = "shopkeeper.db"
