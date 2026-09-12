@@ -23,9 +23,14 @@ import os
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
+database_file = os.getenv("DATABASE_PATH")
+img_path = os.getenv("IMAGES_PATH")
+
+product_per_page = 5
 
 markup1 = ReplyKeyboardMarkup(
-    [["Shopping Cart", "Products", "Wallet", "Purchase_Status"]]
+    [["Shopping Cart", "Products"], ["Wallet", "Purchase_Status"]],
+    resize_keyboard=True,
 )
 
 
@@ -36,69 +41,101 @@ async def start_Command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=markup1,
     )
 
-    database_file = "shopkeeper.db"
+    
     with sqlite3.connect(database_file) as conn:
         Telegram_id = update.effective_user.id
         cursor = conn.cursor()
-        database.find_or_insert_users(cursor, Telegram_id)
+        is_new_user = database.find_or_insert_users(cursor, Telegram_id)
 
         conn.commit()
+
+    if is_new_user:
+        await update.message.reply_text(
+            "What name should we call you by?",
+        )
+        context.user_data["set_name"] = True
+
+
+async def Set_Name_Handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if "set_name" in context.user_data:
+        Telegram_id = update.effective_user.id
+        user_name = update.message.text
+        
+        with sqlite3.connect(database_file) as conn:
+            cursor = conn.cursor()
+            user_id = database.find_user_id(cursor, Telegram_id)[0]
+            database.update_user_name(cursor, user_id, user_name)
+            conn.commit()
+
+        await update.message.reply_text(f"Nice to meet you, {user_name}!")
+        del context.user_data["set_name"]
+        raise ApplicationHandlerStop()
+    else:
+        return
 
 
 async def Menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message.text
     if message == "Shopping Cart":
-        Telegram_id = update.effective_user.id
-        database_file = "shopkeeper.db"
-        with sqlite3.connect(database_file) as conn:
-            cursor = conn.cursor()
-            user_id = database.find_user_id(cursor, Telegram_id)[0]
-            Shopping_Cart = database.View_Shopping_Cart(cursor, user_id)
-            if Shopping_Cart == 0:
-                await update.message.reply_text(
-                    "Your shopping cart history is empty.",
-                )
-            else:
-                
-                for Shopping in Shopping_Cart:
-                    Description = ""
-                    Description += f"Product Name: {Shopping[0]} \n Quantity: {Shopping[1]} \n Price {Shopping[2]} \n Status{Shopping[3]}\n"
-                    if Shopping[3] == "Awaiting payment":
-                        address = database.show_adress(cursor, user_id)
-                        await update.message.reply_text(
-                            Description
-                            + f"Total products{Shopping[4]} , Total price of products{Shopping[5]}"
-                            + f"adress name : {address[0]} \n adress : {address[1]}",
-                            reply_markup=InlineKeyboardMarkup(
-                                [
+            Telegram_id = update.effective_user.id
+            
+            with sqlite3.connect(database_file) as conn:
+                cursor = conn.cursor()
+                user_id = database.find_user_id(cursor, Telegram_id)[0]
+                Shopping_Cart = database.View_Shopping_Cart(cursor, user_id)
+                if Shopping_Cart == 0:
+                    await update.message.reply_text(
+                        "Your shopping cart history is empty.",
+                    )
+                else:
+                    orders = {}
+                    for Shopping in Shopping_Cart:
+                        order_id = Shopping[6]
+                        orders.setdefault(order_id, []).append(Shopping)
+    
+                    for order_id, items in orders.items():
+                        Description = ""
+                        for Shopping in items:
+                            Description += f"Product Name: {Shopping[0]} \n Quantity: {Shopping[1]} \n Price {Shopping[2]} \n Status{Shopping[3]}\n\n"
+    
+                        last_item = items[-1]
+                        if last_item[3] == "Awaiting payment":
+                            address = database.show_adress(cursor, user_id)
+                            await update.message.reply_text(
+                                Description
+                                + f"Total products{last_item[4]} , Total price of products{last_item[5]}"
+                                + f"adress name : {address[0]} \n adress : {address[1]}",
+                                reply_markup=InlineKeyboardMarkup(
                                     [
-                                        InlineKeyboardButton(
-                                            "Proceed to payment gateway",
-                                            callback_data=f"Payment_Gateway_{Shopping[6]}",
-                                        )
+                                        [
+                                            InlineKeyboardButton(
+                                                "Proceed to payment gateway",
+                                                callback_data=f"Payment_Gateway_{order_id}",
+                                            )
+                                        ]
                                     ]
-                                ]
-                            ),
-                        )
-                    else:
-                        await update.message.reply_text(
-                            Description
-                            + f"Total products{Shopping[4]} , Total price of products{Shopping[5]}",
-                            reply_markup=InlineKeyboardMarkup(
-                                [
+                                ),
+                            )
+                        else:
+                            await update.message.reply_text(
+                                Description
+                                + f"Total products{last_item[4]} , Total price of products{last_item[5]}",
+                                reply_markup=InlineKeyboardMarkup(
                                     [
-                                        InlineKeyboardButton(
-                                            "adress", callback_data="adress_form"
-                                        )
+                                        [
+                                            InlineKeyboardButton(
+                                                "adress", callback_data="adress_form"
+                                            )
+                                        ]
                                     ]
-                                ]
-                            ),
-                        )
-
-            conn.commit()
+                                ),
+                            )
+    
+                conn.commit()
     elif message == "Purchase_Status":
         Telegram_id = update.effective_user.id
-        database_file = "shopkeeper.db"
+        
         with sqlite3.connect(database_file) as conn:
             cursor = conn.cursor()
             user_id = database.find_user_id(cursor, Telegram_id)[0]
@@ -137,32 +174,9 @@ async def Menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
             conn.commit()
     elif message == "Products":
-        database_file = "shopkeeper.db"
-        with sqlite3.connect(database_file) as conn:
-
-            cursor = conn.cursor()
-            products = database.get_all_products(cursor)
-
-            for product in products:
-
-                await update.message.reply_photo(
-                    product[1],
-                    f"Product Name: {product[2]} \n Remaining quantity: {product[3]} \n Price: {product[4]} \n Description: {product[5]}",
-                    reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "Add to cart",
-                                    callback_data=f"Add to cart_{product[0]}",
-                                )
-                            ]
-                        ]
-                    ),
-                )
-
-            conn.commit()
+        await send_products_page(update, context, 0)
     elif message == "Wallet":
-        database_file = "shopkeeper.db"
+        
         with sqlite3.connect(database_file) as conn:
             Telegram_id = update.effective_user.id
             cursor = conn.cursor()
@@ -191,6 +205,79 @@ async def Menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("I didn't understand.")
 
 
+async def send_products_page(update: Update, context: ContextTypes.DEFAULT_TYPE, page):
+    chat_id = update.effective_chat.id
+
+    old_message_ids = context.user_data.get("product_message_ids", [])
+    for message_id in old_message_ids:
+        try:
+            await context.bot.delete_message(chat_id, message_id)
+        except Exception:
+            pass
+
+    with sqlite3.connect(database_file) as conn:
+        cursor = conn.cursor()
+        products = database.get_all_products(cursor)
+        conn.commit()
+
+    start = page * product_per_page
+    page_products = products[start : start + product_per_page]
+
+    if not page_products:
+        sent = await context.bot.send_message(chat_id, "There are no products to show.")
+        context.user_data["product_message_ids"] = [sent.message_id]
+        context.user_data["product_page"] = page
+        return
+
+    sent_message_ids = []
+    for product in page_products:
+        caption = f"Product Name: {product[2]} \n Remaining quantity: {product[3]} \n Price: {product[4]} \n Description: {product[5]}"
+        keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Add to cart", callback_data=f"Add to cart_{product[0]}")]]
+        )
+        image_name = product[1]
+        sent = None
+        if image_name:
+            image_path = os.path.join(img_path, image_name)
+            try:
+                with open(image_path, "rb") as image_file:
+                    sent = await context.bot.send_photo(
+                        chat_id, image_file, caption=caption, reply_markup=keyboard
+                    )
+            except FileNotFoundError:
+                sent = None
+        if sent is None:
+            sent = await context.bot.send_message(chat_id, caption, reply_markup=keyboard)
+        sent_message_ids.append(sent.message_id)
+
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(
+            InlineKeyboardButton("◀ Previous", callback_data=f"products_page_{page - 1}")
+        )
+    if start + product_per_page < len(products):
+        nav_buttons.append(
+            InlineKeyboardButton("Next ▶", callback_data=f"products_page_{page + 1}")
+        )
+
+    if nav_buttons:
+        nav_message = await context.bot.send_message(
+            chat_id,
+            f"Page {page + 1}",
+            reply_markup=InlineKeyboardMarkup([nav_buttons]),
+        )
+        sent_message_ids.append(nav_message.message_id)
+
+    context.user_data["product_message_ids"] = sent_message_ids
+    context.user_data["product_page"] = page
+
+
+async def Products_Page_Navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.answer()
+    page = int(update.callback_query.data.split("_")[2])
+    await send_products_page(update, context, page)
+
+
 async def Add_to_Cart_button_handler(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
@@ -214,6 +301,11 @@ async def Add_to_Cart_button_handler(
     Product_Quantity_Button = InlineKeyboardMarkup(Quantity)
 
     await update.callback_query.answer()
+
+    try:
+        await update.callback_query.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
 
     await update.callback_query.message.reply_text(
         "How many of this product do you want?", reply_markup=Product_Quantity_Button
@@ -335,7 +427,7 @@ async def Confirm_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "adress_form" in context.user_data:
 
         Telegram_id = update.effective_user.id
-        database_file = "shopkeeper.db"
+        
         with sqlite3.connect(database_file) as conn:
             adress_data = context.user_data["adress_form"]["data"]
 
@@ -404,7 +496,7 @@ async def Payment_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Telegram_id = update.effective_user.id
     message = update.callback_query
     order_id = int(message.data.split("_")[2])
-    database_file = "shopkeeper.db"
+    
     with sqlite3.connect(database_file) as conn:
 
         cursor = conn.cursor()
@@ -489,7 +581,7 @@ async def Payment_Confirmation(update: Update, context: ContextTypes.DEFAULT_TYP
             ),
         )
     else:
-        database_file = "shopkeeper.db"
+        
         with sqlite3.connect(database_file) as conn:
 
             cursor = conn.cursor()
@@ -521,7 +613,7 @@ async def Cancel_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.callback_query
     order_id = int(message.data.split("_")[2])
     Telegram_id = update.effective_user.id
-    database_file = "shopkeeper.db"
+    
     with sqlite3.connect(database_file) as conn:
 
         cursor = conn.cursor()
@@ -588,7 +680,7 @@ async def top_up_Confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         Telegram_id = update.effective_user.id
-        database_file = "shopkeeper.db"
+        
         with sqlite3.connect(database_file) as conn:
             cursor = conn.cursor()
 
@@ -607,7 +699,7 @@ async def top_up_Confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def Withdrawal_of_funds(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     Telegram_id = update.effective_user.id
-    database_file = "shopkeeper.db"
+    
     with sqlite3.connect(database_file) as conn:
 
         cursor = conn.cursor()
@@ -638,7 +730,7 @@ async def Operations_Withdrawal_of_funds(update: Update, context: ContextTypes.D
                 update.message.text
             )
             Telegram_id = update.effective_user.id
-            database_file = "shopkeeper.db"
+            
             with sqlite3.connect(database_file) as conn:
 
                 cursor = conn.cursor()
@@ -695,7 +787,7 @@ async def Operations_Withdrawal_of_funds(update: Update, context: ContextTypes.D
             else:
                 amount = context.user_data["Withdrawal_of_funds"]["amount"]
                 Telegram_id = update.effective_user.id
-                database_file = "shopkeeper.db"
+                
                 with sqlite3.connect(database_file) as conn:
                     cursor = conn.cursor()
                     user_id = database.find_user_id(cursor, Telegram_id)[0]
@@ -715,7 +807,6 @@ async def Operations_Withdrawal_of_funds(update: Update, context: ContextTypes.D
 
 def Check_Availability_And_Purchase(product_id, quantity, Telegram_id):
 
-    database_file = "shopkeeper.db"
     with sqlite3.connect(database_file) as conn:
 
         cursor = conn.cursor()
@@ -768,15 +859,27 @@ def main():
         group=3,
     )
     application.add_handler(
+            MessageHandler(
+                filters=filters.TEXT & ~filters.COMMAND,
+                callback=Set_Name_Handler,
+            ),
+            group=4,
+        )
+    application.add_handler(
         MessageHandler(
             filters=filters.TEXT & ~filters.COMMAND,
             callback=Menu_message_handler,
         ),
-        group=4,
+        group=5,
     )
     application.add_handler(
         CallbackQueryHandler(
             pattern="^Add to cart_", callback=Add_to_Cart_button_handler
+        )
+    )
+    application.add_handler(
+        CallbackQueryHandler(
+            pattern="^products_page_", callback=Products_Page_Navigation
         )
     )
     application.add_handler(

@@ -1,4 +1,6 @@
 import sqlite3
+from dotenv import load_dotenv
+import os
 
 sql_statements = [
     """CREATE TABLE IF NOT EXISTS Products (
@@ -7,6 +9,7 @@ sql_statements = [
             Products_name TEXT NOT NULL, 
             Quantity INTEGER DEFAULT 0 CHECK(Quantity >= 0) , 
             Price Decimal NOT NULL,
+            Is_active Decimal  NOT NULL DEFAULT 1 CHECK( Is_active IN (0,1))  , 
             Information TEXT NOT NULL
         );""",
     """CREATE TABLE IF NOT EXISTS Users (
@@ -18,7 +21,7 @@ sql_statements = [
         );""",
     """CREATE TABLE IF NOT EXISTS Admin (
             Admin_id  INTEGER PRIMARY KEY, 
-            Admin_name TEXT NOT NULL, 
+            Admin_name TEXT UNIQUE NOT NULL, 
             Password TEXT NOT NULL 
         );""",
     """CREATE TABLE IF NOT EXISTS Orders (
@@ -60,7 +63,7 @@ sql_statements = [
             User_id  INTEGER  NOT NULL,
             Amount Decimal NOT NULL,
             Sheba_number TEXT NOT NULL,
-            Withdrawal_Requests_Status TEXT NOT NULL CHECK(Withdrawal_Requests_Status IN ('pending','approved','rejected')),
+            Withdrawal_Requests_Status TEXT NOT NULL CHECK(Withdrawal_Requests_Status IN ('Pending','Approved','Rejected')),
             Requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             Reviewed_at TIMESTAMP,
             Admin_note TEXT ,
@@ -82,6 +85,15 @@ def find_or_insert_users(cursor, value):
     row = cursor.fetchone()
     if row == None:
         cursor.execute("INSERT INTO Users (Telegram_id) VALUES(?)", (value,))
+        return True
+    return False
+
+
+def update_user_name(cursor, user_id, user_name):
+    cursor.execute(
+        "UPDATE Users SET User_name = ? WHERE User_id = ?",
+        (user_name, user_id),
+    )
 
 
 def find_user_id(cursor, Telegram_id):
@@ -91,7 +103,7 @@ def find_user_id(cursor, Telegram_id):
 
 
 def get_all_products(cursor):
-    cursor.execute("SELECT * FROM Products ")
+    cursor.execute("SELECT * FROM Products WHERE  Is_active = 1")
     rows = cursor.fetchall()
     return rows
 
@@ -313,8 +325,6 @@ def record_wallet_transaction(
                         user_id,
                     ),
                 )
-            elif type == "Withdrawal":
-                pass
         else:
             return 0
 
@@ -353,11 +363,11 @@ def Checking_price_order(cursor, order_id):
 def Withdrawal_of_funds(cursor, user_id, sheba_number, amount):
     cursor.execute(
         "INSERT INTO Withdrawal_Requests ( User_id , Amount , Sheba_number , Withdrawal_Requests_Status ) VALUES(?,?,?,?)",
-        (user_id, amount, sheba_number, "pending"),
+        (user_id, amount, sheba_number, "Pending"),
     )
 
-
-database_file = "shopkeeper.db"
+load_dotenv()
+database_file = os.getenv("DATABASE_PATH")
 
 try:
 
