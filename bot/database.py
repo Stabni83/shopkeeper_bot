@@ -8,9 +8,9 @@ sql_statements = [
             Products_image TEXT,
             Products_name TEXT NOT NULL, 
             Quantity INTEGER DEFAULT 0 CHECK(Quantity >= 0) , 
-            Price Decimal NOT NULL,
-            Is_active Decimal  NOT NULL DEFAULT 1 CHECK( Is_active IN (0,1))  , 
-            Information TEXT NOT NULL
+            Price Decimal NOT NULL,   
+            Information TEXT NOT NULL,
+            Is_active Decimal  NOT NULL DEFAULT 1 CHECK( Is_active IN (0,1))
         );""",
     """CREATE TABLE IF NOT EXISTS Users (
             User_id  INTEGER PRIMARY KEY,

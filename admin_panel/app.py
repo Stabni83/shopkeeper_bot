@@ -210,8 +210,8 @@ def products_page():
         products_dic['Products_name'] = row[2]
         products_dic['Quantity'] = row[3]
         products_dic['Price'] = row[4]
-        products_dic['Is_active'] = row[5]
-        products_dic['Information'] = row[6]
+        products_dic['Information'] = row[5]
+        products_dic['Is_active'] = row[6]
         products_list.append (products_dic)
     return render_template(
         "products.html",
@@ -411,9 +411,16 @@ def orders_page ():
     status = request.args.get('status')
     start = request.args.get('start')
     end = request.args.get('end')
-    cap_status = ''
+    cap_status = None
     if status :
         cap_status = status.capitalize()
+
+    if not start :
+        start = None
+
+    if not end :
+        end = None
+
     filter_orders_list = []
 
     
