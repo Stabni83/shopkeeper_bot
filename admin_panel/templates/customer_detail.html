@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set active_page = 'customers' %}
+
+{% block title %}Customer {{ customer.User_name if customer else '' }}{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="section-kicker">Customer</span>
+    <h1>{{ customer.User_name if customer else 'Customer' }}</h1>
+    <p>User ID #{{ customer.User_id if customer else '—' }} · Wallet: <strong>{{ customer.Walet if customer else '—' }}</strong></p>
+  </div>
+  <a class="ghost-btn" href="{{ url_for('customers_page') }}">← Back</a>
+</section>
+
+<section class="panel-grid two-col">
+  <article class="panel">
+    <div class="panel-head"><h2>Addresses</h2></div>
+    {% if addresses %}
+      <ul class="simple-list">
+        {% for a in addresses %}
+          <li>
+            <strong>{{ a.Address }}</strong>
+            {% if a.Postal_code %}<small>{{ a.Postal_code }}</small>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty-state">No addresses saved.</div>
+    {% endif %}
+  </article>
+
+  <article class="panel">
+    <div class="panel-head"><h2>Wallet transactions</h2></div>
+    {% if transactions %}
+      <ul class="simple-list">
+        {% for t in transactions %}
+          <li>
+            <span>{{ t.created_at }} · {{ t.type }} ({{ t.direction }})</span>
+            <strong>{{ t.amount }}</strong>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty-state">No transactions.</div>
+    {% endif %}
+  </article>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>Orders</h2></div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if orders %}
+          {% for order in orders %}
+            <tr>
+              <td>#{{ order.Order_id }}</td>
+              <td>{{ order.Date }}</td>
+              <td><span class="status status-{{ order.status }}">{{ order.status_label }}</span></td>
+              <td>{{ order.Price }}</td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="4" class="empty-cell">No orders for this customer.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

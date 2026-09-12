@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% set active_page = 'withdrawals' %}
+
+{% block title %}Withdrawal requests{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="section-kicker">Payouts</span>
+    <h1>Withdrawal requests</h1>
+    <p>Review and approve or reject pending requests.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Customer</th>
+          <th>Amount</th>
+          <th>Sheba</th>
+          <th>Requested</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if requests %}
+          {% for r in requests %}
+            <tr>
+              <td data-label="ID">#{{ r.id }}</td>
+              <td data-label="Customer">{{ r.User_name }}</td>
+              <td data-label="Amount"><strong>{{ r.amount }}</strong></td>
+              <td data-label="Sheba" class="mono">{{ r.sheba_number }}</td>
+              <td data-label="Requested">{{ r.requested_at }}</td>
+              <td data-label="Status"><span class="status status-{{ r.status }}">{{ r.status }}</span></td>
+              <td class="card-actions">
+                {% if r.status == 'pending' %}
+                  <div class="row-actions">
+                    <form method="POST" action="{{ url_for('approve_withdrawal') }}" class="inline-form">
+                      <input type="hidden" name="request_id" value="{{ r.id }}">
+                      <button type="submit" class="action-btn success">Approve</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('reject_withdrawal') }}" class="inline-form">
+                      <input type="hidden" name="request_id" value="{{ r.id }}">
+                      <button type="submit" class="action-btn danger">Reject</button>
+                    </form>
+                  </div>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="7" class="empty-cell">No withdrawal requests.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

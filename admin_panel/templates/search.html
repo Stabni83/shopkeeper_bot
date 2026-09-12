@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% set active_page = 'search' %}
+
+{% block title %}Search{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="section-kicker">Search</span>
+    <h1>Results for “{{ q or '' }}”</h1>
+    <p>Orders, products and customers matching your query.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Orders</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Date</th>
+          <th>Customer</th>
+          <th>Status</th>
+          <th>Amount</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if orders %}
+          {% for order in orders %}
+            <tr>
+              <td><strong>#{{ order.Order_id }}</strong></td>
+              <td>{{ order.Date }}</td>
+              <td>{{ order.User_name }}</td>
+              <td><span class="status status-{{ order.status }}">{{ order.status_label }}</span></td>
+              <td><strong>{{ order.Price }}</strong></td>
+              <td>
+                <a class="action-btn" href="{{ url_for('orders_page', status=order.status, highlight=order.Order_id) }}">
+                  View in Orders
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="6" class="empty-cell">No orders found.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Products</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Price</th>
+          <th>Qty</th>
+          <th>Active</th>
+          <th>Info</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if products %}
+          {% for p in products %}
+            <tr>
+              <td>#{{ p.Product_id }}</td>
+              <td><strong>{{ p.Products_name }}</strong></td>
+              <td>{{ p.Price }}</td>
+              <td>{{ p.Quantity }}</td>
+              <td>{{ "Yes" if p.Is_active else "No" }}</td>
+              <td>{{ p.Information or "—" }}</td>
+              <td>
+                <a class="action-btn" href="{{ url_for('products_page', highlight=p.Product_id) }}">
+                  View in Products
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="7" class="empty-cell">No products found.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Customers</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Wallet</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if customers %}
+          {% for c in customers %}
+            <tr>
+              <td>#{{ c.User_id }}</td>
+              <td><strong>{{ c.User_name }}</strong></td>
+              <td>{{ c.Walet }}</td>
+              <td>
+                <a class="action-btn" href="{{ url_for('customer_detail', user_id=c.User_id) }}">
+                  View customer
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="4" class="empty-cell">No customers found.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

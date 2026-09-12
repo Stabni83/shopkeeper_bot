@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% set active_page = 'settings' %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="section-kicker">Account</span>
+    <h1>Settings</h1>
+    <p>Change your admin password.</p>
+  </div>
+</section>
+
+<section class="panel narrow">
+  <form method="POST" action="{{ url_for('change_password') }}" class="settings-form">
+    <label class="field">
+      <span>Current password</span>
+      <input type="password" name="current_password" required autocomplete="current-password">
+    </label>
+    <label class="field">
+      <span>New password</span>
+      <input type="password" name="new_password" required minlength="6" autocomplete="new-password">
+    </label>
+    <label class="field">
+      <span>Confirm new password</span>
+      <input type="password" name="confirm_password" required minlength="6" autocomplete="new-password">
+    </label>
+    <button type="submit" class="primary-btn">Update password</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% set active_page = 'dashboard' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="section-kicker">Overview</span>
+    <h1>Sales overview</h1>
+    <p>Track orders, revenue and payouts from one place.</p>
+  </div>
+</section>
+
+<section class="stat-grid">
+  <article class="stat-card">
+    <span class="stat-label">Total orders</span>
+    <strong class="stat-value">{{ stats.total_orders if stats and stats.total_orders is not none else '—' }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="stat-label">Customers</span>
+    <strong class="stat-value">{{ stats.customers if stats and stats.customers is not none else '—' }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="stat-label">New / Processing</span>
+    <strong class="stat-value">
+      {{ stats.new_orders if stats and stats.new_orders is not none else '—' }}
+      <span class="stat-sub">/ {{ stats.processing_orders if stats and stats.processing_orders is not none else '—' }}</span>
+    </strong>
+  </article>
+  <article class="stat-card accent">
+    <span class="stat-label">Revenue</span>
+    <strong class="stat-value">{{ stats.revenue if stats and stats.revenue is not none else '—' }}</strong>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel chart-panel">
+    <div class="panel-head">
+      <div>
+        <h2>Revenue analytics</h2>
+        <p>Daily sales (last 7 days)</p>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      {% if sales_chart %}
+        <canvas id="salesChart"></canvas>
+        <script>
+          window.__SALES_CHART__ = {{ sales_chart | tojson }};
+        </script>
+      {% else %}
+        <div class="empty-state">No chart data yet.</div>
+      {% endif %}
+    </div>
+  </article>
+
+  <article class="panel payments-panel">
+    <div class="panel-head">
+      <div>
+        <h2>Payments summary</h2>
+        <p>Cash flow at a glance</p>
+      </div>
+    </div>
+    <div class="summary-list">
+      <div class="summary-row">
+        <span>Received</span>
+        <strong>{{ financial.received if financial and financial.received is not none else '—' }}</strong>
+      </div>
+      <div class="summary-row">
+        <span>Awaiting payment</span>
+        <strong>{{ financial.pending if financial and financial.pending is not none else '—' }}</strong>
+      </div>
+      <div class="summary-row">
+        <span>Pending withdrawals</span>
+        <strong>{{ financial.pending_withdrawals if financial and financial.pending_withdrawals is not none else '—' }}</strong>
+      </div>
+    </div>
+    <a class="text-link" href="{{ url_for('wallet_page') }}">View wallets →</a>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Recent orders</h2>
+      <p>Last 10 days</p>
+    </div>
+    <a class="ghost-btn" href="{{ url_for('orders_page') }}">View all</a>
+  </div>
+
+  <div class="table-toolbar">
+    <input id="orderSearch" type="search" placeholder="Filter this table..." class="table-search">
+    <select id="orderStatusFilter" class="table-filter">
+      <option value="">All statuses</option>
+      <option value="paid">Paid</option>
+      <option value="processing">Processing</option>
+      <option value="sent">Sent</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table" id="ordersTable">
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Date</th>
+          <th>Customer</th>
+          <th>Address</th>
+          <th>Status</th>
+          <th>Amount</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if recent_orders %}
+          {% for order in recent_orders %}
+            <tr data-status="{{ order.status }}">
+              <td data-label="Order"><strong>#{{ order.Order_id }}</strong></td>
+              <td data-label="Date">{{ order.Date }}</td>
+              <td data-label="Customer">{{ order.User_name }}</td>
+              <td data-label="Address">
+                <div class="cell-stack">
+                  <span>{{ order.Address or '—' }}</span>
+                  {% if order.Postal_code %}<small>{{ order.Postal_code }}</small>{% endif %}
+                </div>
+              </td>
+              <td data-label="Status">
+                <span class="status status-{{ order.status }}">{{ order.status_label }}</span>
+              </td>
+              <td data-label="Amount"><strong>{{ order.Price }}</strong></td>
+              <td class="card-actions">
+                <div class="row-actions">
+                  {% if order.status == 'paid' %}
+                    <form method="POST" action="{{ url_for('update_order_status') }}" class="inline-form">
+                      <input type="hidden" name="order_id" value="{{ order.Order_id }}">
+                      <input type="hidden" name="status" value="processing">
+                      <button type="submit" class="action-btn">Process</button>
+                    </form>
+                  {% endif %}
+                  {% if order.status == 'processing' %}
+                    <form method="POST" action="{{ url_for('update_order_status') }}" class="inline-form">
+                      <input type="hidden" name="order_id" value="{{ order.Order_id }}">
+                      <input type="hidden" name="status" value="sent">
+                      <button type="submit" class="action-btn">Mark sent</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="empty-cell">No recent orders to show.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    try {
+      const raw = window.__SALES_CHART__;
+      if (!raw || !raw.length) return;
+      const canvas = document.getElementById('salesChart');
+      if (!canvas || !canvas.getContext) return;
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+
+      const formatShort = (n) => {
+        const v = Number(n) || 0;
+        if (v >= 1000000) return (v / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+        if (v >= 1000) return (v / 1000).toFixed(v >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'K';
+        return String(Math.round(v));
+      };
+
+      const shortLabel = (label) => {
+        const s = String(label == null ? '' : label);
+        const m = s.match(/(\d{2})-(\d{2})$/);
+        return m ? (m[1] + '-' + m[2]) : s.slice(-5);
+      };
+
+      const labels = raw.map(function (d) { return shortLabel(d.label); });
+      const values = raw.map(function (d) { return Number(d.value) || 0; });
+      const max = Math.max.apply(null, values.concat([1]));
+
+      function draw() {
+        const cssW = Math.max(canvas.clientWidth || 300, 200);
+        const cssH = 200;
+        canvas.width = Math.floor(cssW * dpr);
+        canvas.height = Math.floor(cssH * dpr);
+        canvas.style.width = '100%';
+        canvas.style.height = cssH + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, cssW, cssH);
+
+        const padL = 40, padR = 10, padT = 16, padB = 26;
+        const plotW = cssW - padL - padR;
+        const plotH = cssH - padT - padB;
+
+        ctx.strokeStyle = '#eef0f4';
+        ctx.lineWidth = 1;
+        for (var i = 0; i <= 2; i++) {
+          var gy = padT + (plotH * i) / 2;
+          ctx.beginPath();
+          ctx.moveTo(padL, gy);
+          ctx.lineTo(cssW - padR, gy);
+          ctx.stroke();
+          ctx.fillStyle = '#a0a4ae';
+          ctx.font = '11px sans-serif';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(formatShort(max * (1 - i / 2)), padL - 6, gy);
+        }
+
+        function xAt(i) {
+          return values.length === 1 ? padL + plotW / 2 : padL + (plotW * i) / (values.length - 1);
+        }
+        function yAt(v) {
+          return padT + plotH - (v / max) * plotH;
+        }
+
+        ctx.beginPath();
+        for (var a = 0; a < values.length; a++) {
+          var ax = xAt(a), ay = yAt(values[a]);
+          if (a === 0) ctx.moveTo(ax, ay); else ctx.lineTo(ax, ay);
+        }
+        ctx.lineTo(xAt(values.length - 1), padT + plotH);
+        ctx.lineTo(xAt(0), padT + plotH);
+        ctx.closePath();
+        var grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+        grad.addColorStop(0, 'rgba(255,106,61,0.20)');
+        grad.addColorStop(1, 'rgba(255,106,61,0.01)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.beginPath();
+        for (var b = 0; b < values.length; b++) {
+          var bx = xAt(b), by = yAt(values[b]);
+          if (b === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
+        }
+        ctx.strokeStyle = '#ff6a3d';
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        for (var c = 0; c < values.length; c++) {
+          var cx = xAt(c), cy = yAt(values[c]);
+          ctx.beginPath();
+          ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff';
+          ctx.fill();
+          ctx.strokeStyle = '#ff6a3d';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = '#8a8d97';
+          ctx.font = '11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(labels[c], cx, cssH - 18);
+        }
+      }
+
+      draw();
+      window.addEventListener('resize', draw);
+    } catch (e) {
+      console.warn('sales chart failed', e);
+    }
+  })();
+</script>
+{% endblock %}

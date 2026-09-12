@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% set active_page = 'wallet' %}
+
+{% block title %}Wallets{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="section-kicker">Payments</span>
+    <h1>Wallet transactions</h1>
+    <p>Full history of charges, purchases and withdrawals.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <form class="filter-bar" method="GET" action="{{ url_for('wallet_page') }}">
+    <label>
+      <span>Search by name</span>
+      <input type="search" name="q" value="{{ request.args.get('q', '') }}" placeholder="Customer name...">
+    </label>
+    <button type="submit" class="primary-btn compact">Search</button>
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Customer</th>
+          <th>Type</th>
+          <th>Direction</th>
+          <th>Amount</th>
+          <th>Date</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if transactions %}
+          {% for t in transactions %}
+            <tr>
+              <td data-label="ID">#{{ t.id }}</td>
+              <td data-label="Customer">{{ t.User_name }}</td>
+              <td data-label="Type">{{ t.type }}</td>
+              <td data-label="Direction">
+                <span class="status {% if t.direction == 'in' %}status-paid{% else %}status-cancelled{% endif %}">
+                  {{ t.direction }}
+                </span>
+              </td>
+              <td data-label="Amount"><strong>{{ t.amount }}</strong></td>
+              <td data-label="Date">{{ t.created_at }}</td>
+              <td data-label="Note">{{ t.description or '—' }}</td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="7" class="empty-cell">No transactions found.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

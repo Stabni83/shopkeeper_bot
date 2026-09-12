@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in | OrderFlow Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
+</head>
+<body>
+  <main class="auth-shell">
+    <section class="auth-card" aria-label="Admin sign in">
+      <div class="brand-row">
+        <div class="brand-mark">O</div>
+        <div class="brand-name">
+          <strong>OrderFlow</strong>
+          <span>Admin Panel</span>
+        </div>
+      </div>
+
+      <div class="heading">
+        <h1>Welcome back</h1>
+        <p>Sign in to manage orders, products and payouts.</p>
+      </div>
+
+      {% if error %}
+        <div class="form-error" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('login') }}" class="auth-form">
+        <label class="field">
+          <span>Username</span>
+          <input
+            type="text"
+            name="username"
+            autocomplete="username"
+            required
+            autofocus
+            placeholder="Enter your username"
+          >
+        </label>
+
+        <label class="field">
+          <span>Password</span>
+          <div class="password-wrap">
+            <input
+              id="password"
+              type="password"
+              name="password"
+              autocomplete="current-password"
+              required
+              placeholder="Enter your password"
+            >
+            <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">
+              Show
+            </button>
+          </div>
+        </label>
+
+        <button class="primary-btn" type="submit">
+          <span>Sign in</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      </form>
+
+      <p class="auth-note">This panel is only accessible to store admins.</p>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='login.js') }}"></script>
+</body>
+</html>

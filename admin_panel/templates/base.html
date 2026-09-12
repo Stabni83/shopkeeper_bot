@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin Panel{% endblock %} | OrderFlow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="app-shell">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <a class="logo" href="{{ url_for('dashboard') }}">
+          <span class="logo-mark">O</span>
+          <span>
+            <strong>OrderFlow</strong>
+            <small>Admin Panel</small>
+          </span>
+        </a>
+        <button class="mobile-close" type="button" data-sidebar-close aria-label="Close menu">×</button>
+      </div>
+
+      <nav class="nav">
+        <p class="nav-title">Menu</p>
+        <a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+          <span class="nav-icon">⌂</span><span>Dashboard</span>
+        </a>
+        <a class="nav-link {% if active_page == 'orders' %}active{% endif %}" href="{{ url_for('orders_page') }}">
+          <span class="nav-icon">▣</span><span>Orders</span>
+        </a>
+        <a class="nav-link {% if active_page == 'products' %}active{% endif %}" href="{{ url_for('products_page') }}">
+          <span class="nav-icon">▤</span><span>Products</span>
+        </a>
+        <a class="nav-link {% if active_page == 'customers' %}active{% endif %}" href="{{ url_for('customers_page') }}">
+          <span class="nav-icon">◔</span><span>Customers</span>
+        </a>
+
+        <p class="nav-title">Payments</p>
+        <a class="nav-link {% if active_page == 'wallet' %}active{% endif %}" href="{{ url_for('wallet_page') }}">
+          <span class="nav-icon">◈</span><span>Wallets</span>
+        </a>
+        <a class="nav-link {% if active_page == 'withdrawals' %}active{% endif %}" href="{{ url_for('withdrawals_page') }}">
+          <span class="nav-icon">↙</span><span>Withdrawal requests</span>
+          {% if pending_withdrawals %}
+            <span class="nav-badge">{{ pending_withdrawals }}</span>
+          {% endif %}
+        </a>
+
+        <p class="nav-title">General</p>
+        <a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('settings_page') }}">
+          <span class="nav-icon">⚙</span><span>Settings</span>
+        </a>
+        <a class="nav-link logout-link" href="{{ url_for('logout') }}">
+          <span class="nav-icon">↪</span><span>Log out</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-user">
+        <div class="avatar">{{ current_user.Admin_name[:1] if current_user and current_user.Admin_name else 'A' }}</div>
+        <div>
+          <strong>{{ current_user.Admin_name if current_user else 'Admin' }}</strong>
+          <small>Store admin</small>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <button class="menu-button" type="button" data-sidebar-open aria-label="Open menu">☰</button>
+
+        <form class="topbar-search" method="GET" action="{{ url_for('global_search') }}">
+          <span>⌕</span>
+          <input name="q" type="search" placeholder="Search orders, products, customers..." autocomplete="off" value="{{ request.args.get('q', '') }}">
+        </form>
+
+        <div class="topbar-actions">
+          <button class="icon-button" type="button" aria-label="Notifications">
+            ♧
+            {% if notification_count %}
+              <span class="notification-dot"></span>
+            {% endif %}
+          </button>
+          <div class="admin-chip">
+            <div class="avatar small">{{ current_user.Admin_name[:1] if current_user and current_user.Admin_name else 'A' }}</div>
+            <span>{{ current_user.Admin_name if current_user else 'Admin' }}</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-stack">
+              {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" data-sidebar-overlay></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

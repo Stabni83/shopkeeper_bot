@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% set active_page = 'customers' %}
+
+{% block title %}Customers{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="section-kicker">Users</span>
+    <h1>Customers</h1>
+    <p>All registered users and their wallet balance.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Wallet balance</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if customers %}
+          {% for c in customers %}
+            <tr>
+              <td data-label="ID">#{{ c.User_id }}</td>
+              <td data-label="Name"><strong>{{ c.User_name }}</strong></td>
+              <td data-label="Wallet">{{ c.Walet }}</td>
+              <td class="card-actions">
+                <a class="action-btn" href="{{ url_for('customer_detail', user_id=c.User_id) }}">View</a>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="4" class="empty-cell">No customers yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

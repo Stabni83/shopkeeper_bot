@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% set active_page = 'orders' %}
+
+{% block title %}Orders{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="section-kicker">Orders</span>
+    <h1>All orders</h1>
+    <p>Filter by status or date range.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <form class="filter-bar" method="GET" action="{{ url_for('orders_page') }}">
+    <label>
+      <span>Status</span>
+      <select name="status">
+        <option value="">All</option>
+        <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
+        <option value="processing" {% if status_filter == 'processing' %}selected{% endif %}>Processing</option>
+        <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>Sent</option>
+        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+      </select>
+    </label>
+    <label>
+      <span>From</span>
+      <input type="date" name="start" value="{{ request.args.get('start', '') }}">
+    </label>
+    <label>
+      <span>To</span>
+      <input type="date" name="end" value="{{ request.args.get('end', '') }}">
+    </label>
+    <button type="submit" class="primary-btn compact">Apply</button>
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Date</th>
+          <th>Customer</th>
+          <th>Address</th>
+          <th>Status</th>
+          <th>Amount</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if orders %}
+          {% for order in orders %}
+            <tr>
+              <td data-label="Order"><strong>#{{ order.Order_id }}</strong></td>
+              <td data-label="Date">{{ order.Date }}</td>
+              <td data-label="Customer">{{ order.User_name }}</td>
+              <td data-label="Address">
+                <div class="cell-stack">
+                  <span>{{ order.Address or '—' }}</span>
+                  {% if order.Postal_code %}<small>{{ order.Postal_code }}</small>{% endif %}
+                </div>
+              </td>
+              <td data-label="Status"><span class="status status-{{ order.status }}">{{ order.status_label }}</span></td>
+              <td data-label="Amount"><strong>{{ order.Price }}</strong></td>
+              <td class="card-actions">
+                <div class="row-actions">
+                  {% if order.status == 'paid' %}
+                    <form method="POST" action="{{ url_for('update_order_status') }}" class="inline-form">
+                      <input type="hidden" name="order_id" value="{{ order.Order_id }}">
+                      <input type="hidden" name="status" value="processing">
+                      <button type="submit" class="action-btn">Process</button>
+                    </form>
+                  {% endif %}
+                  {% if order.status == 'processing' %}
+                    <form method="POST" action="{{ url_for('update_order_status') }}" class="inline-form">
+                      <input type="hidden" name="order_id" value="{{ order.Order_id }}">
+                      <input type="hidden" name="status" value="sent">
+                      <button type="submit" class="action-btn">Mark sent</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="7" class="empty-cell">No orders found for this filter.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

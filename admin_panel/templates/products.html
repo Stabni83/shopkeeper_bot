@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% set active_page = 'products' %}
+
+{% block title %}Products{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="section-kicker">Catalog</span>
+    <h1>Products</h1>
+    <p>Add, edit or deactivate products.</p>
+  </div>
+  <button type="button" class="primary-btn" data-open-modal="add-product">+ Add product</button>
+</section>
+
+<section class="panel">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Price</th>
+          <th>Stock</th>
+          <th>Active</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if products %}
+          {% for p in products %}
+            <tr data-highlight-id="{{ p.Product_id }}">
+              <td>#{{ p.Product_id }}</td>
+              <td>
+                <div class="cell-stack cell-with-thumb">
+                  {% if p.Products_image %}
+                    <img class="product-thumb" src="{{ url_for('product_image', filename=p.Products_image) }}" alt="">
+                  {% else %}
+                    <span class="product-thumb product-thumb-empty">No image</span>
+                  {% endif %}
+                  <div>
+                    <strong>{{ p.Products_name }}</strong>
+                    {% if p.Information %}<small>{{ p.Information }}</small>{% endif %}
+                  </div>
+                </div>
+              </td>
+              <td>{{ p.Price }}</td>
+              <td>{{ p.Quantity }}</td>
+              <td>{{ "Yes" if p.Is_active else "No" }}</td>
+              <td>
+                <div class="row-actions">
+                  <button type="button" class="action-btn"
+                    data-open-modal="edit-product"
+                    data-id="{{ p.Product_id }}"
+                    data-name="{{ p.Products_name }}"
+                    data-price="{{ p.Price }}"
+                    data-quantity="{{ p.Quantity }}"
+                    data-image="{{ p.Products_image or '' }}"
+                    data-information="{{ p.Information or '' }}">
+                    Edit
+                  </button>
+                  <form method="POST" action="{{ url_for('deactivate_product') }}" class="inline-form"
+                        onsubmit="return confirm('Deactivate this product?');">
+                    <input type="hidden" name="product_id" value="{{ p.Product_id }}">
+                    <button type="submit" class="action-btn danger">Deactivate</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="6" class="empty-cell">No products yet. Add your first product.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="modal" id="add-product" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Add product</h2>
+      <button type="button" class="icon-button" data-close-modal>×</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_product') }}" class="modal-form" enctype="multipart/form-data">
+      <label class="field">
+        <span>Name</span>
+        <input type="text" name="name" required>
+      </label>
+      <label class="field">
+        <span>Price</span>
+        <input type="number" name="price" step="0.01" min="0" required>
+      </label>
+      <label class="field">
+        <span>Quantity</span>
+        <input type="number" name="quantity" min="0" required>
+      </label>
+      <label class="field">
+        <span>Image</span>
+        <input type="file" name="image" accept="image/*">
+      </label>
+      <label class="field">
+        <span>Information</span>
+        <textarea name="information" rows="3" required></textarea>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="ghost-btn" data-close-modal>Cancel</button>
+        <button type="submit" class="primary-btn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="edit-product" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Edit product</h2>
+      <button type="button" class="icon-button" data-close-modal>×</button>
+    </div>
+    <form method="POST" action="{{ url_for('edit_product') }}" class="modal-form" enctype="multipart/form-data">
+      <input type="hidden" name="product_id" id="edit-product-id">
+      <input type="hidden" name="current_image" id="edit-product-current-image">
+      <label class="field">
+        <span>Name</span>
+        <input type="text" name="name" id="edit-product-name" required>
+      </label>
+      <label class="field">
+        <span>Price</span>
+        <input type="number" name="price" id="edit-product-price" step="0.01" min="0" required>
+      </label>
+      <label class="field">
+        <span>Quantity</span>
+        <input type="number" name="quantity" id="edit-product-quantity" min="0" required>
+      </label>
+      <label class="field">
+        <span>Image</span>
+        <small id="edit-product-image-current" class="field-hint"></small>
+        <input type="file" name="image" id="edit-product-image" accept="image/*">
+      </label>
+      <label class="field">
+        <span>Information</span>
+        <textarea name="information" id="edit-product-information" rows="3" required></textarea>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="ghost-btn" data-close-modal>Cancel</button>
+        <button type="submit" class="primary-btn">Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
