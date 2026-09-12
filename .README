@@ -1,104 +1,145 @@
-# Shopkeeper Bot
+#ShopkeeperBot
 
-A Telegram storefront for a small business, paired with a Flask admin panel — customers browse products, build a cart, pay, track orders, and manage a wallet entirely inside Telegram, while the shop owner manages products, orders, customers, and payouts from a web dashboard.
+A Telegram store for a small business, complete with a Flask admin panel.
 
-Built as a portfolio project to practice designing a real, two-sided backend: relational database design, stateful conversation flows in a chat bot, session-based auth in a web app, and keeping money-related data (orders, wallet balances, payouts) consistent across both.
+Customers can browse products, build carts, checkout, track orders, and manage a wallet entirely within Telegram.
+
+The store owner manages products, orders, customers, and payments from a clean web dashboard.
+
+Built as a portfolio project that designs a true two-way backend: relational database design, stateful conversation flows in a chatbot, session-based authentication in a web application, and maintaining consistent money-related data (orders, wallet balances, payments) on both sides.
 
 ## What it does
 
-**Customer side (Telegram bot)**
-- Product catalog with photos, paginated browsing, and search-by-cart-add
-- Multi-item shopping cart, quantity picker, and stock validation (can't order more than is in stock)
-- Address book and a guided checkout flow
-- Mock payment gateway (clearly labeled as a stand-in for a real one — see *Scope* below) or pay from wallet balance
-- In-app wallet: top up, spend, see refunds from cancelled orders
-- Withdrawal requests by IBAN, reviewed by the admin before payout
-- Order status tracking and self-serve order cancellation (stock and wallet are restored automatically)
+### Customer side (Telegram bot)
+- Product catalog with photos, paginated browsing
+- Multi-item shopping cart with quantity picker and inventory validation (cannot order more than available inventory)
+- Address book and guided checkout flow
+- Trial payment gateway (clearly labeled as alternative inventory) or pay from wallet balance
+- In-app wallet: automatic charging, spending and refunds from canceled orders
+- Withdrawal requests by IBAN (reviewed by admin before payment)
+- Self-service order status tracking and order cancellation (inventory and wallet are automatically restored)
 
-**Admin side (web panel)**
-- Login (Flask-Login, hashed passwords)
-- Dashboard: revenue, order counts, recent orders, pending withdrawals at a glance
-- Order management: filter by status or date range, move orders through the fulfillment pipeline
-- Product management: add/edit/deactivate products, upload photos
-- Customer directory with a detail view (their orders, addresses, wallet history)
-- Withdrawal request review: approve (checks the customer still has sufficient balance) or reject
-- Global search across products, orders, and customers
-- Wallet transaction ledger, admin password change
+### Admin side (web panel)
+- Secure login (Flask - login with hashed passwords)
+- Dashboard: overview of revenue, number of orders, recent orders and pending withdrawals
+- Order management: filter by status or scope History, transfer of orders through the order fulfillment pipeline
+- Product management: add/edit/deactivate products and upload photos
+- Customer list with details (orders, addresses, wallet history)
+- Withdrawal request review: approve (with inventory check) or reject
+- Global search across products, orders and customers
+- Change wallet transaction ledger and admin password
 
-## Tech stack
+## Technical stack
 
-- **Python** — [`python-telegram-bot`](https://python-telegram-bot.org/) for the bot, **Flask** + **Flask-Login** for the admin panel
-- **SQLite** — one shared database (`shopkeeper.db`) used by both halves of the app
-- Plain HTML/CSS/forms for the admin panel — no JS framework, full-page-refresh interactions by design
+- **Python** — `python-telegram-bot` for the bot, Flask + Flask-Login for the admin panel
+- **SQLite** — a common database (`shopkeeper.db`) used by both the bot and the admin panel
+- HTML / CSS / simple forms for the admin panel (no JavaScript framework, full page refresh as designed)
 
 ## Project structure
 
-```
 shopkeeper_bot/
-├── bot/                  # Telegram bot
-│   ├── main.py
-│   └── database.py
-├── admin_panel/          # Flask admin panel
-│   ├── app.py
-│   ├── database.py
-│   ├── templates/
-│   └── static/
-├── seed_demo_data.py     # fills the DB with realistic demo data + product photos
+├── bot/ # Telegram bot
+│ ├── main.py
+│ └── database.py
+├── admin_panel/ # Flask admin panel
+│ ├── app.py
+│ ├── database.py
+│ ├── templates/
+│ └── static/
+├── photo/ # Product images
+├── project_photo/ # Screenshots for documentation
+├── seed_demo_data.py # Stores realistic demo data + product photos
 ├── requirements.txt
-└── .env.example
-```
+├── .env.example
+└── shopkeeper.db
 
-Both `bot/` and `admin_panel/` have their own `database.py` with matching schema — they talk to the same SQLite file, not to each other directly.
+## Architecture notes
 
-## Database design
+- Both the bot and the admin panel use a common SQLite database.
 
-The schema is normalized to avoid duplicate or inconsistent data:
-- Cart items belong to an `Order`, which belongs to a `User` — not directly to the user, so an order can hold multiple products
-- Every wallet change (top-up, purchase, refund, withdrawal) is its own row in `Wallet_Transactions` — a ledger, not just a balance — so any change in a customer's balance can be traced back to what caused it. `Users.Walet` is a cached running total kept in sync with the ledger for fast reads
-- Stock and wallet balance checks happen atomically to guard against overselling and against a withdrawal draining more than a customer actually has
+- Wallet balance is stored as a running total that stays in sync with the transaction ledger.
 
-## Scope and honest limitations
+- Wallet balance and balance checks are done in a way that prevents overselling and overwithdrawing.
+
+## Honest Scope and Limitations
 
 This is a learning-focused portfolio project, so a few things are intentionally simplified:
-- **Payment gateway is mocked** (a "successful / failed" choice screen) rather than wired to a real payment provider — swapping in a real one wouldn't change the surrounding order logic
-- **Withdrawal payouts are manual**: approving a request marks it approved and adjusts the ledger, but no real bank transfer happens — in production this would call a payout API
-- No automated test suite yet (see *Status* below)
+
+- The payment gateway is displayed as a dummy (a simple success/failure selection screen) instead of a real payment provider.
+
+- Withdrawals are handled manually: confirming the request updates the ledger, but no actual bank transfers are made.
+
+- There is no automated test suite yet.
 
 ## Setup
 
 ```bash
-git clone <repo-url>
+git clone <your-repo-url>
 cd shopkeeper_bot
 python -m venv venv
-source venv/bin/activate   # venv\Scripts\activate on Windows
+source venv/bin/activate # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env       # then fill in BOT_TOKEN and SECRET_KEY
+cp .env.example .env # Then fill in the BOT_TOKEN and SECRET_KEY.
 ```
 
-**Seed some demo data** (recommended before first run — creates a small demo shop with products, customers, orders in every status, and product photos):
+**Demo Seed Data** (recommended before first run):
+
 ```bash
 python seed_demo_data.py
 ```
-This creates a demo admin login: **username `admin`, password `admin123`** (change it from the admin panel's Settings page).
+
+This will create a demo admin account:
+
+**Username:** `admin`
+**Password:** `admin123`
+(Change it later from the admin panel settings page.)
 
 **Run the bot:**
+
 ```bash
 cd bot
 python main.py
 ```
 
 **Run the admin panel** (in a separate terminal):
+
 ```bash
 cd admin_panel
 python app.py
 ```
+
 Then open `http://127.0.0.1:5000` and log in with the demo admin account.
-
-## Status
-
-Actively in development. The bot and admin panel are both feature-complete for the flows above; see the commit history for the step-by-step build, from schema design through the full checkout, wallet, and admin workflows.
 
 ## Screenshots
 
-<!-- Add a few screenshots here before publishing — see the project's notes on
-     turning this into a portfolio piece for exactly which ones are worth including. -->
+<!-- Replace the lines below with your actual screenshots from the project_photo folder -->
+
+**Admin Dashboard**
+![Admin Dashboard](project_photo/your-dashboard-screenshot.png)
+
+**Product Management**
+![Products](project_photo/your-products-screenshot.png)
+
+**Order Management**
+![Orders](project_photo/your-orders-screenshot.png)
+
+**Telegram Bot – Product Catalog**
+![Bot Catalog](project_photo/your-bot-catalog-screenshot.png)
+
+**Telegram Bot – Shopping Cart and Payment**
+![Bot Cart](project_photo/your-bot-cart-screenshot.png)
+
+**Wallet and Withdrawals**
+![Wallet](project_photo/your-wallet-screenshot.png)
+
+## Status
+
+Bot and admin panel include all the necessary features for all the described flows Above.
+
+See the commit history for a step-by-step build process (from schema design to full payment, wallet, and management workflows).
+
+## License
+
+This project is for portfolio/educational purposes.
+
+```
